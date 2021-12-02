@@ -211,4 +211,7 @@ _config.yml
 
 db.sqlite3
 
+.exe
+.cfg
+
 dev.sh

@@ -1,69 +1,32 @@
-from comtypes.client import CreateObject, GetModule
-
-
-class E3DataAccess(object):
-
-	def __init__(self, UUID, host='localhost'):
-		super(E3DataAccess, self).__init__()
-		self._engine = CreateObject(UUID)
-		self._engine.Server = host
-    
-
-	def registerCallback(self, path):
-		return self._engine.RegisterCallback(path)
-
-
-	def updateHost(self, host):
-		self._engine.Server = host
-		return self._engine.Server
-
-
-	def disconnect(self):
-		return self._engine.Disconnect()
-
-
-	def connect(self):
-		return self._engine.Connect()
-
-
-	def getDomainState(self):
-		return self._engine.DomainState
-
-
-	def readvalue(self, pathname):
-		try:
-			return self._engine.ReadValue(pathname)
-		except Exception as e:
-			print(e)
-
-
-	def executeQuery(self, query):
-		return self._engine.ExecuteQuery(query)
-
-
-	def writevalue(self, pathname, date, quality, value):
-		try:
-			self._engine.WriteValue(pathname, date, quality, value)
-		except Exception as e:
-			print(e)
-
-	def closeConnect(self):
-		del self._engine
+from E3DataAccess import E3DataAccess
+from comtypes.client import CreateObject, ShowEvents, PumpEvents, GetEvents
 
 
 class Elipse(object):
-	
-	
-	def __init__(self, UUID, host, template):
+
+
+	def __init__(self, host='localhost', template=None):
 		super(Elipse, self).__init__()
-		self._E3DataAccess = E3DataAccess(UUID=UUID, host=host)
+		self._E3DataAccess = None
+		self.error = False
 		self._template = template
+		############# Atributos de manipulação dos eventos Elipse ##############
+		self._sinkEvents = EventSink()
+		self._connectionEvents = None
+		########################################################################
+		try:
+			self._E3DataAccess = E3DataAccess(host=host)
+			self._connectionEvents = self._E3DataAccess.onValueChanged(self._sinkEvents)
+		except Exception as e:
+			print(e)
+			self.error = True
 
 
 	def updateHost(self, host):
 		host = self._E3DataAccess.updateHost(host)
 		print("Elipse -> Reconectado Host: ", host)
 		return host
+
 
 	def writeValue(self):
 		self._E3DataAccess.writevalue(pathname="IEC61850.[IO.WorkOnline]", date="23/10/2021 00:29:56", quality=192, value="1")
@@ -75,6 +38,9 @@ class Elipse(object):
 
 	def registerCallback(self, path):
 		return self._E3DataAccess.registerCallback(path)
+
+	def unregisterCallback(self, path):
+		return self._E3DataAccess.unregisterCallback(path)
 
 
 	def executeQuery(self, query):
@@ -122,11 +88,12 @@ class Elipse(object):
 		EqpsStatus = self._E3DataAccess.readvalue(self._template.get('EqpsStatus'))[2]
 		return f'LinkStatus: {LinkStatus}\nComStatus: {ComStatus}\nElipseStatus: {ElipseStatus}\nEqpsStatus: {EqpsStatus}'
 
+
 	def getDOM(self):
 		statusDOM = "Em execução!" if self._E3DataAccess.getDomainState() == 3 else "Parado!"
 		return f'Domínio: {statusDOM}\n'
 
-	
+
 	def getAll(self, SE, BAY, EQ):
 		status = self._E3DataAccess.readvalue(self._template.get('status').format(SE=SE, BAY=BAY, EQ=EQ))[2]
 		if status == 1:
@@ -142,3 +109,41 @@ class Elipse(object):
 		VBC = self._E3DataAccess.readvalue(self._template.get('VBC').format(SE=SE, BAY=BAY, EQ=EQ))[2]
 		VCA = self._E3DataAccess.readvalue(self._template.get('VCA').format(SE=SE, BAY=BAY, EQ=EQ))[2]
 		return f'Equipamento: {EQ}\nStatus: {status}\nIA: {IA}\nIB: {IB}\nIC: {IC}\nVAB: {VAB}\nVBC: {VBC}\nVCA: {VCA}'
+
+
+	def printTableQuery(self, q):
+		try:
+			if q[1]:
+				q = list(q[0])
+
+				print('colunas:', len(q), 'linhas', len(q[0]))
+
+				for linha in range(len(q[0])):
+				    aux = ''
+				    for coluna in range(len(q)):
+				        aux = aux + "\t" + str(q[coluna][linha])
+				    print(aux)
+		except Exception as e:
+			print(e)
+
+
+	def pumpEventsChanged(self, time=-1):
+		self._E3DataAccess.pumpEventsChanged(time)
+
+
+	def setObjectEventSink(self, object):
+		self._sinkEvents.setObjectEventSink(object)
+
+
+class EventSink(object):
+
+	def __init__(self, arg=None):
+		super(EventSink, self).__init__()
+		self.arg = arg
+		self.object = None
+
+	def setObjectEventSink(self, object):
+		self.object = object
+
+	def _IE3DataAccessManagerEvents_OnValueChanged(self, this, pathname, timestamp, quality, value):
+		print(self.object, pathname, value)
