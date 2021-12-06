@@ -1,3 +1,4 @@
+import time
 from E3DataAccess import E3DataAccess
 from comtypes.client import CreateObject, ShowEvents, PumpEvents, GetEvents
 
@@ -37,6 +38,7 @@ class Elipse(object):
 
 
 	def registerCallback(self, path):
+		print("Registrando: ", path)
 		return self._E3DataAccess.registerCallback(path)
 
 	def unregisterCallback(self, path):
@@ -131,8 +133,26 @@ class Elipse(object):
 		self._E3DataAccess.pumpEventsChanged(time)
 
 
-	def setObjectEventSink(self, object):
-		self._sinkEvents.setObjectEventSink(object)
+	def setObjectEventListSink(self, object):
+		self._sinkEvents.setObjectEventListSink(object)
+
+
+	def getObjectEventListSink(self):
+		return self._sinkEvents.getObjectEventListSink()
+
+
+	def setObjectEventMutexSink(self, object):
+		self._sinkEvents.setObjectEventMutexSink(object)
+
+
+	def getObjectEventMutexSink(self):
+		return self._sinkEvents.getObjectEventMutexSink()
+
+
+	def registerDevice(self, SE, BAY, EQ):
+		#return list(map(lambda key: self.registerCallback(self._template['measurements'][key].format(SE=SE, BAY=BAY, EQ=EQ)), self._template.get('measurements')))
+		return list(map(lambda key: self.registerCallback(self._template['measurements'][key]), self._template.get('measurements')))
+
 
 
 class EventSink(object):
@@ -140,10 +160,29 @@ class EventSink(object):
 	def __init__(self, arg=None):
 		super(EventSink, self).__init__()
 		self.arg = arg
-		self.object = None
+		self.eventList = []
+		self.mutex = None
 
-	def setObjectEventSink(self, object):
-		self.object = object
+
+	def setObjectEventListSink(self, object):
+		self.eventList = object
+
+
+	def setObjectEventMutexSink(self, object):
+		self.mutex = object
+
+
+	def getObjectEventListSink(self):
+		return self.eventList
+
+
+	def getObjectEventMutexSink(self):
+		return self.mutex
+		
 
 	def _IE3DataAccessManagerEvents_OnValueChanged(self, this, pathname, timestamp, quality, value):
-		print(self.object, pathname, value)
+		self.mutex.acquire()
+		text = "{};{};\t{}".format(time.strftime("%d-%m-%Y %H:%M:%S", time.gmtime()), pathname, value)
+		print("+ ", text, " Buffer: ", len(self.eventList))
+		self.eventList.append(text)
+		self.mutex.release()

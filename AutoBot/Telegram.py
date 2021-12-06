@@ -56,6 +56,13 @@ class Telegram(object):
 						tag = text[1]
 						print('Cancelando o registro da TAG: ', tag, self._Elipse.unregisterCallback(tag))
 						self.sendMessage('Tag ' + tag + ' cancelada o registro com sucesso!')
+					elif action.lower() == '/re':
+						text = text[1].split('.')
+						SE = text[0]
+						BAY = 'B'+text[1]
+						EQ = text[1]
+						print('Registrando equipamento: ', SE + '.' + EQ, self._Elipse.registerDevice(SE=SE, BAY=BAY, EQ=EQ))
+						self.sendMessage('Equipamento registrado com sucesso!')
 
 
 
